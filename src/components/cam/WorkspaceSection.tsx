@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
+import ImportModal, { type ImportedFile } from '@/components/cam/ImportModal';
 
 const toolpaths = [
   { id: 1, name: 'Контурная обработка', type: 'Контур', color: '#00ff9d', depth: 5, feed: 800, rpm: 12000, status: 'ok' },
@@ -11,18 +12,33 @@ const toolpaths = [
 export default function WorkspaceSection() {
   const [selected, setSelected] = useState(1);
   const [view, setView] = useState<'2d' | '3d'>('2d');
+  const [showImport, setShowImport] = useState(false);
+  const [importedFile, setImportedFile] = useState<ImportedFile | null>(null);
+
+  const handleImport = (file: ImportedFile) => {
+    setImportedFile(file);
+  };
 
   return (
-    <div className="flex-1 flex gap-3 p-3 min-h-0 animate-fade-in">
+    <div className="flex-1 flex gap-3 p-3 min-h-0 animate-fade-in relative">
       {/* Left panel — toolpath list */}
       <div className="w-64 flex flex-col gap-2 flex-shrink-0">
         <div className="glass-panel rounded-xl p-3">
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-mono tracking-widest" style={{ color: 'rgba(0,255,157,0.5)' }}>ТРАЕКТОРИИ</span>
-            <button className="btn-neon text-[10px] font-mono px-2 py-1 rounded-md flex items-center gap-1">
-              <Icon name="Plus" size={11} />
-              Добавить
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowImport(true)}
+                className="btn-neon text-[10px] font-mono px-2 py-1 rounded-md flex items-center gap-1"
+                title="Импорт DXF/STEP/STL"
+              >
+                <Icon name="Upload" size={11} />
+                Импорт
+              </button>
+              <button className="btn-neon text-[10px] font-mono px-2 py-1 rounded-md flex items-center gap-1">
+                <Icon name="Plus" size={11} />
+              </button>
+            </div>
           </div>
           <div className="flex flex-col gap-1.5">
             {toolpaths.map(tp => (
@@ -207,6 +223,33 @@ export default function WorkspaceSection() {
           </div>
         </div>
       </div>
+
+      {/* Imported file badge on canvas */}
+      {importedFile && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 animate-fade-in">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+            style={{ background: 'rgba(4,9,7,0.95)', border: '1px solid rgba(0,255,157,0.35)', boxShadow: '0 0 20px rgba(0,255,157,0.2)' }}>
+            <Icon name="FileCheck" size={14} style={{ color: '#00ff9d' }} />
+            <span className="text-xs font-mono" style={{ color: '#00ff9d' }}>{importedFile.name}</span>
+            <span className="tag-badge" style={{ background: 'rgba(0,255,157,0.1)', color: '#00ff9d', border: '1px solid rgba(0,255,157,0.2)' }}>
+              {importedFile.format}
+            </span>
+            <span className="text-[9px] font-mono" style={{ color: 'rgba(0,255,157,0.4)' }}>
+              {importedFile.width}×{importedFile.height} мм · {importedFile.entities} объектов
+            </span>
+            <button onClick={() => setImportedFile(null)} className="ml-1 toolbar-btn w-5 h-5 rounded">
+              <Icon name="X" size={10} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showImport && (
+        <ImportModal
+          onClose={() => setShowImport(false)}
+          onImport={handleImport}
+        />
+      )}
     </div>
   );
 }
