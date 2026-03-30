@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
+import { useCam } from '@/components/cam/CamContext';
+import type { Section } from '@/components/cam/Sidebar';
 
 interface SliderFieldProps {
   label: string;
@@ -30,19 +32,69 @@ function SliderField({ label, value, min, max, unit, color = '#00ff9d', onChange
   );
 }
 
-export default function ParametersSection() {
-  const [feed, setFeed] = useState(800);
-  const [rpm, setRpm] = useState(12000);
-  const [depth, setDepth] = useState(5);
-  const [stepover, setStepover] = useState(40);
-  const [coolant, setCoolant] = useState(true);
-  const [compensation, setCompensation] = useState('left');
-  const [tolerance, setTolerance] = useState(0.01);
+interface Props {
+  onNavigate: (s: Section) => void;
+}
+
+export default function ParametersSection({ onNavigate }: Props) {
+  const { toolpaths, selectedId, setSelectedId, updateParams, getSelectedParams } = useCam();
+  const current = getSelectedParams();
+
+  const [feed, setFeed] = useState(current.feed);
+  const [rpm, setRpm] = useState(current.rpm);
+  const [depth, setDepth] = useState(current.depth);
+  const [stepover, setStepover] = useState(current.stepover);
+  const [coolant, setCoolant] = useState(current.coolant);
+  const [compensation, setCompensation] = useState(current.compensation);
+  const [tolerance, setTolerance] = useState(current.tolerance);
+  const [saved, setSaved] = useState(false);
+
+  // Sync when selected toolpath changes
+  useEffect(() => {
+    const p = getSelectedParams();
+    setFeed(p.feed);
+    setRpm(p.rpm);
+    setDepth(p.depth);
+    setStepover(p.stepover);
+    setCoolant(p.coolant);
+    setCompensation(p.compensation);
+    setTolerance(p.tolerance);
+    setSaved(false);
+  }, [selectedId]);
+
+  const handleSave = () => {
+    updateParams(selectedId, { feed, rpm, depth, stepover, coolant, compensation, tolerance });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const selectedToolpath = toolpaths.find(tp => tp.id === selectedId);
 
   return (
     <div className="flex-1 p-3 flex gap-3 min-h-0 animate-fade-in overflow-auto">
       {/* Column 1 */}
       <div className="flex-1 flex flex-col gap-3 min-w-0">
+
+        {/* Toolpath selector */}
+        <div className="glass-panel rounded-xl p-3">
+          <div className="text-[10px] font-mono tracking-widest mb-2" style={{ color: 'rgba(0,255,157,0.5)' }}>ТРАЕКТОРИЯ</div>
+          <div className="flex gap-1.5 flex-wrap">
+            {toolpaths.map(tp => (
+              <button
+                key={tp.id}
+                onClick={() => setSelectedId(tp.id)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-golos transition-all"
+                style={selectedId === tp.id
+                  ? { background: `${tp.color}20`, border: `1px solid ${tp.color}60`, color: '#fff' }
+                  : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(0,255,157,0.08)', color: 'rgba(160,200,180,0.5)' }}
+              >
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: tp.color }} />
+                {tp.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="glass-panel rounded-xl p-4">
           <div className="text-[10px] font-mono tracking-widest mb-4" style={{ color: 'rgba(0,255,157,0.5)' }}>РЕЖИМЫ РЕЗАНИЯ</div>
           <SliderField label="Подача" value={feed} min={50} max={5000} unit="мм/мин" onChange={setFeed} />
@@ -50,7 +102,6 @@ export default function ParametersSection() {
           <SliderField label="Глубина резания" value={depth} min={0} max={50} unit="мм" color="#ffd93d" onChange={setDepth} />
           <SliderField label="Перекрытие (stepover)" value={stepover} min={1} max={100} unit="%" color="#ff6b35" onChange={setStepover} />
 
-          {/* Calculated results */}
           <div className="mt-4 p-3 rounded-xl" style={{ background: 'rgba(0,255,157,0.04)', border: '1px solid rgba(0,255,157,0.1)' }}>
             <div className="text-[9px] font-mono tracking-widest mb-2" style={{ color: 'rgba(0,255,157,0.4)' }}>РАСЧЁТ</div>
             <div className="grid grid-cols-3 gap-3">
@@ -73,10 +124,14 @@ export default function ParametersSection() {
           <SliderField label="Точность" value={Math.round(tolerance * 1000)} min={1} max={100} unit="мкм" color="#00e5ff"
             onChange={v => setTolerance(v / 1000)} />
           <div className="grid grid-cols-3 gap-2 mt-2">
-            {['Черновая (0.1мм)', 'Получист. (0.05мм)', 'Чист. (0.01мм)'].map(t => (
-              <button key={t} className="py-1.5 px-2 rounded-lg text-[9px] font-mono text-center transition-all btn-neon"
-                onClick={() => setTolerance(t.includes('0.1') ? 0.1 : t.includes('0.05') ? 0.05 : 0.01)}>
-                {t}
+            {[
+              { label: 'Черновая (0.1мм)', val: 0.1 },
+              { label: 'Получист. (0.05мм)', val: 0.05 },
+              { label: 'Чист. (0.01мм)', val: 0.01 },
+            ].map(t => (
+              <button key={t.label} className="py-1.5 px-2 rounded-lg text-[9px] font-mono text-center transition-all btn-neon"
+                onClick={() => setTolerance(t.val)}>
+                {t.label}
               </button>
             ))}
           </div>
@@ -109,15 +164,14 @@ export default function ParametersSection() {
           <div className="mb-4">
             <div className="text-xs font-golos mb-2" style={{ color: 'rgba(160,200,180,0.7)' }}>Направление обхода</div>
             <div className="grid grid-cols-2 gap-1.5">
-              {['climb', 'conventional'].map(d => {
-                const labels: Record<string, string> = { climb: 'Попутное', conventional: 'Встречное' };
-                return (
-                  <button key={d}
-                    className="py-1.5 rounded-lg text-[10px] font-mono transition-all btn-neon">
-                    {labels[d]}
-                  </button>
-                );
-              })}
+              {[
+                { id: 'climb', label: 'Попутное' },
+                { id: 'conventional', label: 'Встречное' },
+              ].map(d => (
+                <button key={d.id} className="py-1.5 rounded-lg text-[10px] font-mono transition-all btn-neon">
+                  {d.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -152,10 +206,35 @@ export default function ParametersSection() {
               <span className="text-xs font-mono font-bold" style={{ color: '#00ff9d' }}>{v}</span>
             </div>
           ))}
-          <button className="btn-neon-solid w-full mt-4 py-2.5 rounded-xl text-sm font-golos font-semibold flex items-center justify-center gap-2">
-            <Icon name="Save" size={15} />
-            Сохранить параметры
+
+          <button
+            onClick={handleSave}
+            className="w-full mt-4 py-2.5 rounded-xl text-sm font-golos font-semibold flex items-center justify-center gap-2 transition-all"
+            style={saved
+              ? { background: 'rgba(0,255,157,0.15)', border: '1px solid rgba(0,255,157,0.4)', color: '#00ff9d' }
+              : { background: 'linear-gradient(135deg,#00ff9d,#00c97a)', color: '#050d0a', fontWeight: 700 }}
+          >
+            <Icon name={saved ? 'CheckCircle' : 'Save'} size={15} />
+            {saved ? 'Сохранено!' : 'Сохранить параметры'}
           </button>
+
+          {saved && (
+            <button
+              onClick={() => onNavigate('workspace')}
+              className="btn-neon w-full mt-2 py-2 rounded-xl text-xs font-golos font-medium flex items-center justify-center gap-2 animate-fade-in"
+            >
+              <Icon name="Monitor" size={13} />
+              Открыть рабочее пространство →
+            </button>
+          )}
+
+          {selectedToolpath && (
+            <div className="mt-3 p-2.5 rounded-lg" style={{ background: 'rgba(0,255,157,0.03)', border: '1px solid rgba(0,255,157,0.08)' }}>
+              <div className="text-[9px] font-mono" style={{ color: 'rgba(0,255,157,0.4)' }}>
+                Применяется к: <span style={{ color: '#00ff9d' }}>{selectedToolpath.name}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

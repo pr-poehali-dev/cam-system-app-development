@@ -1,19 +1,17 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import ImportModal, { type ImportedFile } from '@/components/cam/ImportModal';
-
-const toolpaths = [
-  { id: 1, name: 'Контурная обработка', type: 'Контур', color: '#00ff9d', depth: 5, feed: 800, rpm: 12000, status: 'ok' },
-  { id: 2, name: 'Карманная выборка', type: 'Карман', color: '#00e5ff', depth: 12, feed: 500, rpm: 10000, status: 'ok' },
-  { id: 3, name: 'Сверление Ø8', type: 'Сверление', color: '#ffd93d', depth: 30, feed: 200, rpm: 3000, status: 'warn' },
-  { id: 4, name: 'Финишное фрезерование', type: 'Финиш', color: '#ff6b35', depth: 2, feed: 1200, rpm: 18000, status: 'ok' },
-];
+import { useCam } from '@/components/cam/CamContext';
 
 export default function WorkspaceSection() {
-  const [selected, setSelected] = useState(1);
+  const { toolpaths, selectedId, setSelectedId } = useCam();
+  const selected = selectedId;
+  const setSelected = setSelectedId;
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [showImport, setShowImport] = useState(false);
   const [importedFile, setImportedFile] = useState<ImportedFile | null>(null);
+
+  const activeToolpath = toolpaths.find(tp => tp.id === selected);
 
   const handleImport = (file: ImportedFile) => {
     setImportedFile(file);
@@ -58,21 +56,30 @@ export default function WorkspaceSection() {
                 </div>
                 <div className="flex gap-3 ml-4">
                   <span className="text-[9px] font-mono" style={{ color: 'rgba(0,255,157,0.4)' }}>{tp.type}</span>
-                  <span className="text-[9px] font-mono" style={{ color: 'rgba(0,229,255,0.4)' }}>↓{tp.depth}мм</span>
+                  <span className="text-[9px] font-mono" style={{ color: 'rgba(0,229,255,0.4)' }}>↓{tp.params.depth}мм</span>
+                  <span className="text-[9px] font-mono" style={{ color: 'rgba(255,107,53,0.4)' }}>F{tp.params.feed}</span>
                 </div>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats — live from context */}
         <div className="glass-panel rounded-xl p-3">
-          <div className="text-[10px] font-mono tracking-widest mb-3" style={{ color: 'rgba(0,255,157,0.5)' }}>ПАРАМЕТРЫ</div>
-          {[
-            { label: 'Подача', value: '800', unit: 'мм/мин' },
-            { label: 'Обороты', value: '12,000', unit: 'об/мин' },
-            { label: 'Глубина', value: '5.0', unit: 'мм' },
-            { label: 'Время', value: '24:35', unit: 'мин' },
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-mono tracking-widest" style={{ color: 'rgba(0,255,157,0.5)' }}>ПАРАМЕТРЫ</span>
+            {activeToolpath && (
+              <div className="flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: activeToolpath.color }} />
+                <span className="text-[8px] font-mono truncate max-w-[80px]" style={{ color: 'rgba(160,200,180,0.4)' }}>{activeToolpath.name}</span>
+              </div>
+            )}
+          </div>
+          {activeToolpath ? [
+            { label: 'Подача', value: activeToolpath.params.feed.toString(), unit: 'мм/мин' },
+            { label: 'Обороты', value: activeToolpath.params.rpm.toLocaleString(), unit: 'об/мин' },
+            { label: 'Глубина', value: activeToolpath.params.depth.toFixed(1), unit: 'мм' },
+            { label: 'Stepover', value: `${activeToolpath.params.stepover}`, unit: '%' },
           ].map(s => (
             <div key={s.label} className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: 'rgba(0,255,157,0.06)' }}>
               <span className="text-[10px] font-golos" style={{ color: 'rgba(160,200,180,0.6)' }}>{s.label}</span>
@@ -81,7 +88,7 @@ export default function WorkspaceSection() {
                 <span className="text-[9px] font-mono" style={{ color: 'rgba(0,255,157,0.4)' }}>{s.unit}</span>
               </div>
             </div>
-          ))}
+          )) : null}
         </div>
       </div>
 
